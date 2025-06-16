@@ -1,5 +1,5 @@
 const {build} = require("esbuild");
-const preactJsxSignalsPlugin = require("../index");
+const esbuildBabelPlugin = require("esbuild-babel-plugin");
 const path = require("path");
 const fs = require("fs/promises");
 const os = require("node:os");
@@ -14,7 +14,12 @@ async function transform(inputCode) {
             write: false,
             jsx: "automatic",
             jsxImportSource: "preact",
-            plugins: [preactJsxSignalsPlugin()],
+            plugins: [esbuildBabelPlugin({
+                filter: /\.(jsx|tsx)$/,
+                plugins: [
+                    require("../index")
+                ]
+            })],
             sourcemap: true,
             loader: {".jsx": "jsx"}
         });

@@ -1,93 +1,89 @@
-const parse = require("@babel/parser").parse;
-const traverse = require("@babel/traverse").default;
-const generate = require("@babel/generator").default;
 const {
     arrowFunctionExpression,
     callExpression,
-    expressionStatement,
-    file,
     identifier,
     importDeclaration,
     importSpecifier,
-    program,
-    stringLiteral
+    stringLiteral,
 } = require("@babel/types");
-const {readFile} = require("fs/promises");
 
-function containsMemberAccess(expr) {
-    let found = false;
-
-    traverse(file(program([expressionStatement(expr)])), {
-        MemberExpression(path) {
-            found = true;
-            path.stop();
-        }
-    });
-
-    return found;
-}
-
-module.exports = () => {
+/**
+ * Preact JSX Signals Plugin
+ *
+ * @param babel {{types: import("@babel/types")}}
+ * @param options {any}
+ * @returns {import("@babel/core").PluginObj}
+ */
+module.exports = function preactJsxSignalsPlugin(babel, options = {}) {
     return {
         name: "preact-jsx-signals",
-        setup({onLoad}) {
-            onLoad({filter: /\.(jsx|tsx)$/}, async (args) => {
-                const source = await readFile(args.path, {encoding: "utf8"});
 
-                const ast = parse(source, {
-                    sourceType: "module",
-                    plugins: ["jsx", "typescript"]
-                });
+        manipulateOptions(opts, parserOpts) {
+            if (!parserOpts.plugins) {
+                parserOpts.plugins = [];
+            }
+            if (!parserOpts.plugins.includes("jsx")) {
+                parserOpts.plugins.push("jsx");
+            }
+            if (!parserOpts.plugins.includes("typescript")) {
+                parserOpts.plugins.push("typescript");
+            }
+        },
 
-                let importComputed = false;
-
-                traverse(ast, {
-                    JSXExpressionContainer(path) {
-                        const expr = path.node.expression;
-                        if (containsMemberAccess(expr)) {
-                            importComputed = true;
-                            path.node.expression = callExpression(
-                                identifier("computed"),
-                                [arrowFunctionExpression([], expr)]
-                            );
-                        }
-                    },
-                    JSXSpreadAttribute(path) {
-                        const arg = path.node.argument;
-                        if (containsMemberAccess(arg)) {
-                            importComputed = true;
-                            path.node.argument = callExpression(
-                                identifier('computed'),
-                                [arrowFunctionExpression([], arg)]
-                            );
-                        }
+        visitor: {
+            Program: {
+                enter(path, state) {
+                    state.shouldInject = false;
+                    state.shouldWrap = [];
+                },
+                exit(path, state) {
+                    if (state.shouldInject) {
+                        path.unshiftContainer("body",
+                            importDeclaration(
+                                [importSpecifier(identifier("computed"), identifier("computed"))],
+                                stringLiteral("@preact/signals")
+                            )
+                        );
                     }
-                });
-
-                if (importComputed) {
-                    ast.program.body.unshift(
-                        importDeclaration(
-                            [importSpecifier(identifier("computed"), identifier("computed"))],
-                            stringLiteral("@preact/signals")
-                        )
-                    );
                 }
+            },
 
-                const {code, map} = generate(ast, {
-                    sourceMaps: true,
-                    sourceFileName: args.path
-                }, source);
+            JSXExpressionContainer: {
+                enter(path, state) {
+                    state.shouldWrap.push(false);
+                },
+                exit(path, state) {
+                    if (state.shouldWrap.pop()) {
+                        state.shouldInject = true;
+                        path.node.expression = callExpression(
+                            identifier("computed"),
+                            [arrowFunctionExpression([], path.node.expression)]
+                        );
+                    }
+                }
+            },
 
-                const encodedMap = Buffer.from(JSON.stringify(map)).toString("base64");
-                const contents = `${code}\n//# sourceMappingURL=data:application/json;base64,${encodedMap}`;
+            JSXSpreadAttribute: {
+                enter(path, state) {
+                    state.shouldWrap.push(false);
+                },
+                exit(path, state) {
+                    if (state.shouldWrap.pop()) {
+                        state.shouldInject = true;
+                        path.node.argument = callExpression(
+                            identifier("computed"),
+                            [arrowFunctionExpression([], path.node.argument)]
+                        );
+                    }
+                }
+            },
 
-                return {
-                    contents,
-                    loader: "tsx",
-                    resolveDir: require("path").dirname(args.path),
-                    watchFiles: [args.path]
-                };
-            });
+            MemberExpression(path, state) {
+                if (state.shouldWrap.length) {
+                    state.shouldWrap[state.shouldWrap.length - 1] = true;
+                }
+            }
         }
     };
 };
+;
