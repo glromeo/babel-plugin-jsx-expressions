@@ -1,5 +1,5 @@
 {
-  "name": "plugin-preact-jsx-signals",
+  "name": "babel-plugin-jsx-expressions",
   "version": "0.2.0",
   "main": "index.js",
   "license": "MIT",

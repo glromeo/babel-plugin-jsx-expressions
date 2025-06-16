@@ -1,4 +1,4 @@
-# preact-jsx-signals (Babel plugin)
+# babel-plugin-jsx-expressions
 
 A Babel plugin that automatically wraps JSX expressions and spread attributes containing member access (e.g. `foo.bar`) in `computed(() => ...)` calls from [`@preact/signals`](https://preactjs.com/guide/v10/signals/).
 
@@ -15,7 +15,7 @@ npm install --save-dev @babel/core @preact/signals
 Also install this plugin (locally or from your project):
 
 ```sh
-npm install --save-dev ./path/to/preact-jsx-signals-plugin.js
+npm install --save-dev babel-plugin-jsx-expressions
 ```
 
 ---
@@ -24,7 +24,7 @@ npm install --save-dev ./path/to/preact-jsx-signals-plugin.js
 
 ```js
 const { transformSync } = require("@babel/core");
-const plugin = require("./preact-jsx-signals-plugin");
+const plugin = require("babel-plugin-jsx-expressions");
 
 const result = transformSync(code, {
   filename: "file.tsx",
@@ -38,7 +38,7 @@ Or in your `babel.config.js`:
 
 ```js
 module.exports = {
-  plugins: ["./preact-jsx-signals-plugin"]
+  plugins: ["babel-plugin-jsx-expressions"]
 };
 ```
 

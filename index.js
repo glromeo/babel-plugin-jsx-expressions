@@ -8,13 +8,13 @@ const {
 } = require("@babel/types");
 
 /**
- * Preact JSX Signals Plugin
+ * Babel plugin JSX expressions
  *
  * @param babel {{types: import("@babel/types")}}
  * @param options {any}
  * @returns {import("@babel/core").PluginObj}
  */
-module.exports = function preactJsxSignalsPlugin(babel, options = {}) {
+module.exports = function pluginJsxExpressions(babel, options = {}) {
     return {
         name: "preact-jsx-signals",
 
