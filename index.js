@@ -82,8 +82,11 @@ module.exports = function pluginJsxExpressions(babel, options = {}) {
                 if (state.shouldWrap.length) {
                     state.shouldWrap[state.shouldWrap.length - 1] = true;
                 }
-            }
+            },
+            NewExpression: path => path.skip(),
+            ArrowFunctionExpression: path => path.skip(),
+            FunctionExpression: path => path.skip()
         }
     };
 };
-;
+
