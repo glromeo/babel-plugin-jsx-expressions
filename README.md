@@ -1,6 +1,6 @@
 # babel-plugin-jsx-expressions
 
-Plugin to automatically wrap JSX expressions and spread attributes with member access (e.g. foo.bar) in computed(() => ...) from [`@preact/signals`](https://preactjs.com/guide/v10/signals/).
+Plugin to automatically wrap JSX expressions and spread attributes containing any member access with a computed [signal](https://preactjs.com/guide/v10/signals/).
 
 This enables signal-safe expressions in JSX when using Preact with the Signals library.
 
