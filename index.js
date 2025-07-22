@@ -16,7 +16,7 @@ const {
  */
 module.exports = function pluginJsxExpressions(babel, options = {}) {
     return {
-        name: "preact-jsx-signals",
+        name: "plugin-jsx-expressions",
 
         manipulateOptions(opts, parserOpts) {
             if (!parserOpts.plugins) {
