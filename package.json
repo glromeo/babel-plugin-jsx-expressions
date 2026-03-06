@@ -1,19 +1,36 @@
 {
   "name": "babel-plugin-jsx-expressions",
-  "version": "0.3.0",
+  "version": "0.5.0",
   "main": "index.js",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/glromeo/babel-plugin-jsx-expressions"
+  },
+  "files": [
+    "index.js",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "jest --coverage"
+  },
+  "jest": {
+    "collectCoverageFrom": [
+      "index.js"
+    ]
+  },
   "peerDependencies": {
-    "@babel/core": "^7.24.0",
-    "@babel/types": "^7.24.1",
-    "esbuild-babel-plugin": "^0.1.0"
+    "@babel/core": "^7.29.0",
+    "@babel/plugin-syntax-jsx": "^7.28.6",
+    "@babel/types": "^7.29.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.24.0",
-    "@babel/plugin-syntax-jsx": "^7.24.1",
-    "@babel/types": "^7.24.1",
-    "esbuild": "^0.20.0",
-    "esbuild-babel-plugin": "^0.1.0",
-    "jest": "^29.7.0"
+    "@babel/core": "^7.29.0",
+    "@babel/plugin-syntax-jsx": "^7.28.6",
+    "@babel/types": "^7.29.0",
+    "esbuild": "^0.27.3",
+    "esbuild-babel-plugin": "^0.5.0",
+    "jest": "^30.2.0"
   }
 }

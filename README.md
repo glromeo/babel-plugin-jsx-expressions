@@ -1,6 +1,7 @@
 # babel-plugin-jsx-expressions
 
-Plugin to automatically wrap JSX expressions and spread attributes containing any member access with a computed [signal](https://preactjs.com/guide/v10/signals/).
+Plugin to automatically wrap JSX expressions and spread attributes containing any member access with a
+computed [signal](https://preactjs.com/guide/v10/signals/).
 
 This enables signal-safe expressions in JSX when using Preact with the Signals library.
 
@@ -23,13 +24,13 @@ npm install --save-dev babel-plugin-jsx-expressions
 ## Usage with Babel
 
 ```js
-const { transformSync } = require("@babel/core");
+const {transformSync} = require("@babel/core");
 const plugin = require("babel-plugin-jsx-expressions");
 
 const result = transformSync(code, {
   filename: "file.tsx",
   plugins: [plugin],
-  parserOpts: { sourceType: "module" },
+  parserOpts: {sourceType: "module"},
   sourceMaps: true
 });
 ```
@@ -40,6 +41,43 @@ Or in your `babel.config.js`:
 module.exports = {
   plugins: ["babel-plugin-jsx-expressions"]
 };
+```
+
+---
+
+## Usage with esbuild
+
+Install [`esbuild-babel-plugin`](https://github.com/nicolo-ribaudo/esbuild-babel-plugin) to hook Babel into the esbuild
+pipeline:
+
+```sh
+npm install --save-dev esbuild esbuild-babel-plugin
+```
+
+Then use it in your build script:
+
+```js
+const {build} = require("esbuild");
+const esbuildBabelPlugin = require("esbuild-babel-plugin");
+const plugin = require("babel-plugin-jsx-expressions");
+
+await build({
+  entryPoints: ["src/index.tsx"],
+  bundle: true,
+  outdir: "dist",
+  plugins: [
+    esbuildBabelPlugin({
+      filter: /\.(jsx?|tsx?)$/,
+      plugins: [plugin],
+    }),
+  ],
+});
+```
+
+Plugin options can be passed alongside the plugin reference:
+
+```js
+plugins: [["jsx-expressions", {factories: {svg: {module: "my-svg", name: "svg"}}}]]
 ```
 
 ---
@@ -55,7 +93,8 @@ This plugin transforms JSX like:
 into:
 
 ```jsx
-import { computed } from "@preact/signals";
+import {computed} from "@preact/signals";
+
 <div>{computed(() => foo.bar)}</div>
 ```
 
@@ -71,7 +110,8 @@ It also works for JSX spread attributes:
 
 ## Notes
 
-* The plugin ensures the Babel parser supports both `jsx` and `typescript` by injecting those parser plugins via `manipulateOptions()`.
+* The plugin ensures the Babel parser supports both `jsx` and `typescript` by injecting those parser plugins via
+  `manipulateOptions()`.
 * Only expressions containing a `MemberExpression` (e.g. `a.b`) are wrapped.
 * Nested JSX containers are handled correctly.
 
