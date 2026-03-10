@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>HTML Test Runner</title>
+    <link rel="stylesheet" href="../node_modules/jasmine-core/lib/jasmine-core/jasmine.css">
+    <script src="../node_modules/jasmine-core/lib/jasmine-core/jasmine.js"></script>
+    <script src="../node_modules/jasmine-core/lib/jasmine-core/jasmine-html.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "preact/jsx-runtime": "../node_modules/preact/jsx-runtime/dist/jsxRuntime.mjs",
+                "preact": "../node_modules/preact/dist/preact.mjs"
+            }
+        }
+    </script>
+    <script type="module">
+      try {
+        const registration = await navigator.serviceWorker.register("./service-worker.mjs", {
+          scope: "./",
+          type: "module"
+        });
+        if (!registration.active) {
+          location.reload();
+        }
+      } catch (error) {
+        console.error("service worker registration failed", error);
+      }
+    </script>
+</head>
+<body>
+<div id="fixtures"></div>
+<script>
+  const jasmine = jasmineRequire.core(jasmineRequire);
+  jasmineRequire.html(jasmine);
+
+  const env = jasmine.getEnv();
+
+  Object.assign(jasmine.getGlobal(), jasmineRequire.interface(jasmine, env), {jasmine});
+
+  const queryString = new jasmine.QueryString({getWindowLocation: () => window.location});
+
+  const config = {
+    stopOnSpecFailure: queryString.getParam("stopOnSpecFailure"),
+    stopSpecOnExpectationFailure: queryString.getParam("stopSpecOnExpectationFailure"),
+    hideDisabled: queryString.getParam("hideDisabled"),
+    get specFilter() {
+      const filter = new jasmine.HtmlSpecFilter({filterString: () => queryString.getParam("spec")});
+      Object.defineProperty(this, "specFilter", {value: spec => filter.matches(spec.getFullName())});
+      return this.specFilter;
+    },
+    get random() {
+      const random = queryString.getParam("random");
+      return random || undefined;
+    },
+    get seed() {
+      const seed = queryString.getParam("seed");
+      return seed || undefined;
+    }
+  };
+  const htmlReporter = new jasmine.HtmlReporter({
+    env,
+    navigateWithNewParam(key, value) {
+      return queryString.navigateWithNewParam(key, value);
+    },
+    addToExistingQueryString(key, value) {
+      return queryString.fullStringWithNewParam(key, value);
+    },
+    getContainer() {
+      return document.body;
+    },
+    createElement() {
+      return document.createElement.apply(document, arguments);
+    },
+    createTextNode() {
+      return document.createTextNode.apply(document, arguments);
+    },
+    timer: new jasmine.Timer(),
+    filterSpecs: !!queryString.getParam("spec")
+  });
+  env.addReporter(jsApiReporter);
+  env.addReporter(htmlReporter);
+  env.configure(config);
+</script>
+<script src="./transpiled.spec.tsx" type="module"></script>
+<script type="module">
+  const env = jasmine.getEnv();
+  htmlReporter.initialize();
+  env.execute();
+</script>
+</body>
+</html>

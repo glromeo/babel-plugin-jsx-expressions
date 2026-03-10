@@ -1,41 +1,29 @@
 # babel-plugin-jsx-expressions
 
-Plugin to automatically wrap JSX expressions and spread attributes containing any member access with a
-computed [signal](https://preactjs.com/guide/v10/signals/).
-
-This enables signal-safe expressions in JSX when using Preact with the Signals library.
+A Babel plugin that transforms JSX into `jsx(tag, props)` factory calls while making reactive expressions
+lazy — expressions containing member access or calls are wrapped in arrow functions (for intrinsic
+elements) or getter methods (for function components), enabling fine-grained reactivity compatible with
+[Preact Signals](https://preactjs.com/guide/v10/signals/).
 
 ---
 
 ## Installation
 
 ```sh
-npm install --save-dev @babel/core @preact/signals
+npm install --save-dev @babel/core babel-plugin-jsx-expressions
 ```
 
-Also install this plugin (locally or from your project):
+Preact is required at runtime (for the default `preact/jsx-runtime` factory):
 
 ```sh
-npm install --save-dev babel-plugin-jsx-expressions
+npm install preact
 ```
 
 ---
 
 ## Usage with Babel
 
-```js
-const {transformSync} = require("@babel/core");
-const plugin = require("babel-plugin-jsx-expressions");
-
-const result = transformSync(code, {
-  filename: "file.tsx",
-  plugins: [plugin],
-  parserOpts: {sourceType: "module"},
-  sourceMaps: true
-});
-```
-
-Or in your `babel.config.js`:
+In your `babel.config.js`:
 
 ```js
 module.exports = {
@@ -43,12 +31,23 @@ module.exports = {
 };
 ```
 
+Or programmatically:
+
+```js
+const {transformSync} = require("@babel/core");
+const plugin = require("babel-plugin-jsx-expressions");
+
+const result = transformSync(code, {
+  filename: "file.tsx",
+  plugins: [plugin]
+});
+```
+
 ---
 
 ## Usage with esbuild
 
-Install [`esbuild-babel-plugin`](https://github.com/nicolo-ribaudo/esbuild-babel-plugin) to hook Babel into the esbuild
-pipeline:
+Install [`esbuild-babel-plugin`](https://github.com/nicolo-ribaudo/esbuild-babel-plugin) to hook Babel into the esbuild pipeline:
 
 ```sh
 npm install --save-dev esbuild esbuild-babel-plugin
@@ -74,46 +73,98 @@ await build({
 });
 ```
 
-Plugin options can be passed alongside the plugin reference:
-
-```js
-plugins: [["jsx-expressions", {factories: {svg: {module: "my-svg", name: "svg"}}}]]
-```
-
 ---
 
 ## What it does
 
-This plugin transforms JSX like:
+The plugin replaces JSX syntax with explicit `jsx(tag, props)` factory calls and makes reactive
+expressions lazy so that Preact Signals can track them.
+
+**Static expressions** are passed as plain values:
 
 ```jsx
-<div>{foo.bar}</div>
-```
-
-into:
-
-```jsx
-import {computed} from "@preact/signals";
-
-<div>{computed(() => foo.bar)}</div>
-```
-
-It also works for JSX spread attributes:
-
-```jsx
-<Component {...some.obj} />
+<div class="hello">World</div>
 // becomes
-<Component {...computed(() => some.obj)} />
+jsx("div", { class: "hello", children: "World" });
+```
+
+**Reactive expressions** — those containing a member access (`a.b`, `a[i]`) or a call (`fn()`) — are
+wrapped to defer evaluation:
+
+- On **intrinsic elements** (`<div>`, `<span>`, etc.), reactive props and children become **arrow functions**:
+
+```jsx
+<div title={obj.label}>{sig.value}</div>
+// becomes
+jsx("div", {
+  title: () => obj.label,
+  children: () => sig.value
+});
+```
+
+- On **function components**, reactive props and children become **getter methods**:
+
+```jsx
+<MyComponent title={obj.label}>{sig.value}</MyComponent>
+// becomes
+jsx(MyComponent, {
+  get title() { return obj.label; },
+  get children() { return sig.value; }
+});
+```
+
+Event handlers (`onClick`, `onInput`, etc.) and arrow function expressions are never wrapped.
+
+---
+
+## Options
+
+| Option | Type | Description |
+|---|---|---|
+| `factories` | `object` | Override the JSX factory for `jsx`, `svg`, `xhtml`, or `Fragment`. |
+| `aliases` | `object` | Rewrite import source strings (e.g. map a short alias to a full module path). |
+
+Example — custom SVG factory:
+
+```js
+plugins: [["babel-plugin-jsx-expressions", {
+  factories: { svg: { module: "my-svg-runtime", name: "svg" } }
+}]]
 ```
 
 ---
 
 ## Notes
 
-* The plugin ensures the Babel parser supports both `jsx` and `typescript` by injecting those parser plugins via
-  `manipulateOptions()`.
-* Only expressions containing a `MemberExpression` (e.g. `a.b`) are wrapped.
-* Nested JSX containers are handled correctly.
+- The plugin injects the `jsx` and `typescript` Babel parser plugins automatically via `manipulateOptions()`, so no separate parser configuration is needed.
+- Nested JSX is handled correctly — inner elements are transformed before outer ones.
+
+---
+
+## Tests
+
+### Node (Jest)
+
+```sh
+npm test
+```
+
+Runs three suites:
+
+- **`test/babel.spec.js`** — static transform tests: each case calls `babel.transformSync` and compares the output string against the expected code.
+- **`test/esbuild.spec.js`** — esbuild integration tests via `esbuild-babel-plugin`.
+- **`test/inline.spec.js`** — runtime tests: JSX is transformed and executed against the real Preact `jsx` runtime.
+- **`test/transpiled.spec.tsx`** — runtime tests written in TSX, transformed by `babel-jest` and executed with the real Preact runtime using Jest's built-in `expect`.
+
+### Browser
+
+```sh
+npm run bundle   # produces dist/plugin.mjs
+```
+
+Then serve the project root (e.g. `npx serve .`) and open `test/test-runner.html`. A service worker intercepts
+requests for `.tsx`/`.jsx`/`.ts` files and transpiles them on the fly using `@babel/standalone` + the bundled
+plugin. Results appear in the browser console (`✓`/`✗`).
 
 ---
 

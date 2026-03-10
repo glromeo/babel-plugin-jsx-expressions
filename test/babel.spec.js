@@ -1,10 +1,20 @@
-const {transformWithBabel, transformWithESBuild, normalize, stripImports} = require("./helper");
+const babel = require("@babel/core");
+const plugin = require("../index");
 
-// full(source)       — transform and include imports in output
-// full(source, opts) — transform with custom plugin options
-// expr(source)       — transform, strip import lines (expression output only)
-const full = (source, opts) => normalize(transformWithBabel(source, opts));
-const expr = source => stripImports(transformWithBabel(source));
+const transformSync = (source, options = {}) => babel.transformSync(source, {
+  configFile: false,
+  plugins: [[plugin, options]],
+  filename: "test.tsx",
+  sourceType: "module"
+}).code;
+const stripSourceMapping = code => {
+  const idx = code.lastIndexOf("//# sourceMappingURL");
+  return idx === -1 ? code : code.slice(0, idx);
+}
+const normalize = code => stripSourceMapping(code).split("\n").map(l => l.trim()).filter(Boolean).join("\n");
+const stripImports = code => code.split("\n").filter(l => !l.startsWith("import ")).join("\n");
+const transpiledCode = (source, opts) => normalize(transformSync(source, opts));
+const transpiledExpression = source => stripImports(transpiledCode(source));
 
 expect.extend({
   toMatchCode(received, expected) {
@@ -21,14 +31,14 @@ expect.extend({
 describe("fragment", () => {
 
   test("empty fragment", () => {
-    expect(full(`<></>`)).toMatchCode(`
+    expect(transpiledCode(`<></>`)).toMatchCode(`
         import { jsx, Fragment } from "preact/jsx-runtime";
         jsx(Fragment, {});
     `);
   });
 
   test("fragment with space text", () => {
-    expect(expr(`<> </>`)).toMatchCode(`
+    expect(transpiledExpression(`<> </>`)).toMatchCode(`
         jsx(Fragment, {
             children: " "
         });
@@ -36,42 +46,42 @@ describe("fragment", () => {
   });
 
   test("text-only fragments are string literals", () => {
-    expect(expr(`<>undefined</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>undefined</>`)).toMatchCode(`
         jsx(Fragment, {
             children: "undefined"
         });
     `);
-    expect(expr(`<>null</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>null</>`)).toMatchCode(`
         jsx(Fragment, {
             children: "null"
         });
     `);
-    expect(expr(`<>0</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>0</>`)).toMatchCode(`
         jsx(Fragment, {
             children: "0"
         });
     `);
-    expect(expr(`<>1</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>1</>`)).toMatchCode(`
         jsx(Fragment, {
             children: "1"
         });
     `);
-    expect(expr(`<>false</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>false</>`)).toMatchCode(`
         jsx(Fragment, {
             children: "false"
         });
     `);
-    expect(expr(`<>true</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>true</>`)).toMatchCode(`
         jsx(Fragment, {
             children: "true"
         });
     `);
-    expect(expr(`<>Hello</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>Hello</>`)).toMatchCode(`
         jsx(Fragment, {
             children: "Hello"
         });
     `);
-    expect(expr(`<>Hello World</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>Hello World</>`)).toMatchCode(`
         jsx(Fragment, {
             children: "Hello World"
         });
@@ -79,11 +89,11 @@ describe("fragment", () => {
   });
 
   test("empty expression container is ignored", () => {
-    expect(expr(`<>{}</>`)).toMatchCode(`jsx(Fragment, {});`);
+    expect(transpiledExpression(`<>{}</>`)).toMatchCode(`jsx(Fragment, {});`);
   });
 
   test("space + empty expression + space produces two space children", () => {
-    expect(expr(`<> {} </>`)).toMatchCode(`
+    expect(transpiledExpression(`<> {} </>`)).toMatchCode(`
         jsx(Fragment, {
             children: [" ", " "]
         });
@@ -91,7 +101,7 @@ describe("fragment", () => {
   });
 
   test("tab collapses to space", () => {
-    expect(expr(`<>\t</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>\t</>`)).toMatchCode(`
         jsx(Fragment, {
             children: " "
         });
@@ -99,7 +109,7 @@ describe("fragment", () => {
   });
 
   test("newline-indented text is trimmed", () => {
-    expect(expr(`<> \n\t {"\t"} \n </>`)).toMatchCode(`
+    expect(transpiledExpression(`<> \n\t {"\t"} \n </>`)).toMatchCode(`
         jsx(Fragment, {
             children: [" ", "\t", " "]
         });
@@ -107,7 +117,7 @@ describe("fragment", () => {
   });
 
   test("mixed text and expression children", () => {
-    expect(expr(`<> \na {"\t"} b\n </>`)).toMatchCode(`
+    expect(transpiledExpression(`<> \na {"\t"} b\n </>`)).toMatchCode(`
         jsx(Fragment, {
             children: [" a ", "\t", " b"]
         });
@@ -115,7 +125,7 @@ describe("fragment", () => {
   });
 
   test("text and empty expression children", () => {
-    expect(expr(`<>Hello{}World</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>Hello{}World</>`)).toMatchCode(`
         jsx(Fragment, {
             children: ["Hello", "World"]
         });
@@ -123,37 +133,37 @@ describe("fragment", () => {
   });
 
   test("expression children: undefined, null, numbers, booleans, strings", () => {
-    expect(expr(`<>{undefined}</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>{undefined}</>`)).toMatchCode(`
         jsx(Fragment, {
             children: undefined
         });
     `);
-    expect(expr(`<>{null}</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>{null}</>`)).toMatchCode(`
         jsx(Fragment, {
             children: null
         });
     `);
-    expect(expr(`<>{0}</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>{0}</>`)).toMatchCode(`
         jsx(Fragment, {
             children: 0
         });
     `);
-    expect(expr(`<>{1}</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>{1}</>`)).toMatchCode(`
         jsx(Fragment, {
             children: 1
         });
     `);
-    expect(expr(`<>{false}</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>{false}</>`)).toMatchCode(`
         jsx(Fragment, {
             children: false
         });
     `);
-    expect(expr(`<>{true}</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>{true}</>`)).toMatchCode(`
         jsx(Fragment, {
             children: true
         });
     `);
-    expect(expr(`<>{"Hello"}</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>{"Hello"}</>`)).toMatchCode(`
         jsx(Fragment, {
             children: "Hello"
         });
@@ -161,7 +171,7 @@ describe("fragment", () => {
   });
 
   test("multiple string expression children", () => {
-    expect(expr(`<>{"Hello"}{"World"}</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>{"Hello"}{"World"}</>`)).toMatchCode(`
         jsx(Fragment, {
             children: ["Hello", "World"]
         });
@@ -169,7 +179,7 @@ describe("fragment", () => {
   });
 
   test("array expression child", () => {
-    expect(expr(`<>{["Hello","World"]}</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>{["Hello","World"]}</>`)).toMatchCode(`
         jsx(Fragment, {
             children: ["Hello", "World"]
         });
@@ -182,11 +192,11 @@ describe("fragment", () => {
 describe("fragments & signals", () => {
 
   test("empty expression in element is dropped", () => {
-    expect(expr(`<p>{}</p>`)).toMatchCode(`jsx("p", {});`);
+    expect(transpiledExpression(`<p>{}</p>`)).toMatchCode(`jsx("p", {});`);
   });
 
   test("plain identifier child is not reactive", () => {
-    expect(expr(`<p>{fn}</p>`)).toMatchCode(`
+    expect(transpiledExpression(`<p>{fn}</p>`)).toMatchCode(`
         jsx("p", {
             children: fn
         });
@@ -194,7 +204,7 @@ describe("fragments & signals", () => {
   });
 
   test("nested element child", () => {
-    expect(expr(`<><p/></>`)).toMatchCode(`
+    expect(transpiledExpression(`<><p/></>`)).toMatchCode(`
         jsx(Fragment, {
             children: jsx("p", {})
         });
@@ -202,7 +212,7 @@ describe("fragments & signals", () => {
   });
 
   test("nested element with text child", () => {
-    expect(expr(`<><p>NO</p></>`)).toMatchCode(`
+    expect(transpiledExpression(`<><p>NO</p></>`)).toMatchCode(`
         jsx(Fragment, {
             children: jsx("p", {
                 children: "NO"
@@ -212,7 +222,7 @@ describe("fragments & signals", () => {
   });
 
   test("mixed text and identifier child is not reactive", () => {
-    expect(expr(`<><p>NO{fn}</p></>`)).toMatchCode(`
+    expect(transpiledExpression(`<><p>NO{fn}</p></>`)).toMatchCode(`
         jsx(Fragment, {
             children: jsx("p", {
                 children: ["NO", fn]
@@ -222,7 +232,7 @@ describe("fragments & signals", () => {
   });
 
   test("call expression child is wrapped in arrow (intrinsic)", () => {
-    expect(expr(`<p>{fn()}</p>`)).toMatchCode(`
+    expect(transpiledExpression(`<p>{fn()}</p>`)).toMatchCode(`
         jsx("p", {
             children: () => fn()
         });
@@ -230,7 +240,7 @@ describe("fragments & signals", () => {
   });
 
   test("multiple reactive children in fragment are individually wrapped", () => {
-    expect(expr(`<>{fn()}{fn()}</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>{fn()}{fn()}</>`)).toMatchCode(`
         jsx(Fragment, {
             children: [() => fn(), () => fn()]
         });
@@ -238,7 +248,7 @@ describe("fragments & signals", () => {
   });
 
   test("spread child with call is reactive (arrow wraps entire array)", () => {
-    expect(expr(`<p>{...fn()}</p>`)).toMatchCode(`
+    expect(transpiledExpression(`<p>{...fn()}</p>`)).toMatchCode(`
         jsx("p", {
             children: () => [...fn()]
         });
@@ -246,7 +256,7 @@ describe("fragments & signals", () => {
   });
 
   test("mixed static and reactive spread children", () => {
-    expect(expr(`<p>{0}{...fn()}{gn()}</p>`)).toMatchCode(`
+    expect(transpiledExpression(`<p>{0}{...fn()}{gn()}</p>`)).toMatchCode(`
         jsx("p", {
             children: () => [0, ...fn(), gn()]
         });
@@ -255,7 +265,7 @@ describe("fragments & signals", () => {
 
   test("already-transformed jsx children are not reactive", () => {
     // jsx() call is reactive in source, but <p> becomes a call AFTER transformation
-    expect(expr(`<><p>{jsx()}</p></>`)).toMatchCode(`
+    expect(transpiledExpression(`<><p>{jsx()}</p></>`)).toMatchCode(`
         jsx(Fragment, {
             children: jsx("p", {
                 children: () => jsx()
@@ -265,12 +275,12 @@ describe("fragments & signals", () => {
   });
 
   test("signal value child is reactive (member expression)", () => {
-    expect(expr(`<>{$s}</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>{$s}</>`)).toMatchCode(`
         jsx(Fragment, {
             children: $s
         });
     `);
-    expect(expr(`<>{$s.value}</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>{$s.value}</>`)).toMatchCode(`
         jsx(Fragment, {
             children: () => $s.value
         });
@@ -278,7 +288,7 @@ describe("fragments & signals", () => {
   });
 
   test("multiple signal children are individually wrapped", () => {
-    expect(expr(`<>{$s.value}{$s.value}</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>{$s.value}{$s.value}</>`)).toMatchCode(`
         jsx(Fragment, {
             children: [() => $s.value, () => $s.value]
         });
@@ -286,7 +296,7 @@ describe("fragments & signals", () => {
   });
 
   test("spread child without reactivity is not wrapped", () => {
-    expect(expr(`<>{...["Hello","World"]}</>`)).toMatchCode(`
+    expect(transpiledExpression(`<>{...["Hello","World"]}</>`)).toMatchCode(`
         jsx(Fragment, {
             children: [...["Hello", "World"]]
         });
@@ -298,7 +308,7 @@ describe("fragments & signals", () => {
 
 describe("FC (function components)", () => {
   test("component vs intrinsic tag detection", () => {
-    expect(full(`
+    expect(transpiledCode(`
         let FC = () => {}, div = <div/>;
         <FC></FC>;
         <CF></CF>;
@@ -314,7 +324,7 @@ describe("FC (function components)", () => {
   });
 
   test("Fragment import on demand", () => {
-    expect(full(`
+    expect(transpiledCode(`
         import { Fragment } from "preact/jsx-runtime";
         function FO() {
             let FC = () => {};
@@ -336,7 +346,7 @@ describe("FC (function components)", () => {
   });
 
   test("component with spread attribute (non-reactive)", () => {
-    expect(expr(`<FC class={"cx"} {...unknown}></FC>`)).toMatchCode(`
+    expect(transpiledExpression(`<FC class={"cx"} {...unknown}></FC>`)).toMatchCode(`
         jsx(FC, {
             class: "cx",
             ...unknown
@@ -345,7 +355,7 @@ describe("FC (function components)", () => {
   });
 
   test("component with reactive array spread child uses getter", () => {
-    expect(expr(`<FC>{['a', ...unknown.value]}</FC>`)).toMatchCode(`
+    expect(transpiledExpression(`<FC>{['a', ...unknown.value]}</FC>`)).toMatchCode(`
         jsx(FC, {
             get children() {
                 return ['a', ...unknown.value];
@@ -355,7 +365,7 @@ describe("FC (function components)", () => {
   });
 
   test("component with non-reactive array spread child uses plain prop", () => {
-    expect(expr(`<FC>{['a', ...unknown]}</FC>`)).toMatchCode(`
+    expect(transpiledExpression(`<FC>{['a', ...unknown]}</FC>`)).toMatchCode(`
         jsx(FC, {
             children: ['a', ...unknown]
         });
@@ -363,7 +373,7 @@ describe("FC (function components)", () => {
   });
 
   test("member expression tag (Namespace.Component)", () => {
-    expect(full(`
+    expect(transpiledCode(`
         const Namespace = { Component: () => {} };
         <Namespace.Component></Namespace.Component>
     `)).toMatchCode(`
@@ -376,7 +386,7 @@ describe("FC (function components)", () => {
   });
 
   test("comprehensive component with all prop types", () => {
-    expect(full(`
+    expect(transpiledCode(`
         let FC = () => {};
         let value, fn, obj;
         <FC class="one" style="color: red;"
@@ -428,7 +438,7 @@ describe("FC (function components)", () => {
 
 describe("elements", () => {
   test("text child", () => {
-    expect(expr(`<div>Hello Sailor!</div>`)).toMatchCode(`
+    expect(transpiledExpression(`<div>Hello Sailor!</div>`)).toMatchCode(`
         jsx("div", {
             children: "Hello Sailor!"
         });
@@ -436,7 +446,7 @@ describe("elements", () => {
   });
 
   test("mixed text and string expression children", () => {
-    expect(expr(`<div>Hello {"Great"} Sailor!</div>`)).toMatchCode(`
+    expect(transpiledExpression(`<div>Hello {"Great"} Sailor!</div>`)).toMatchCode(`
         jsx("div", {
             children: ["Hello ", "Great", " Sailor!"]
         });
@@ -444,7 +454,7 @@ describe("elements", () => {
   });
 
   test("newline-indented mixed children", () => {
-    expect(expr(`<div>\n\t  Hello {"Great"} Sailor!\n  </div>`)).toMatchCode(`
+    expect(transpiledExpression(`<div>\n\t  Hello {"Great"} Sailor!\n  </div>`)).toMatchCode(`
         jsx("div", {
             children: ["Hello ", "Great", " Sailor!"]
         });
@@ -452,7 +462,7 @@ describe("elements", () => {
   });
 
   test("reactive nested element prop uses arrow (intrinsic)", () => {
-    expect(expr(`<div el={<p>{fn()}</p>}/>`)).toMatchCode(`
+    expect(transpiledExpression(`<div el={<p>{fn()}</p>}/>`)).toMatchCode(`
         jsx("div", {
             el: () => jsx("p", {
                 children: () => fn()
@@ -462,7 +472,7 @@ describe("elements", () => {
   });
 
   test("static nested element prop uses arrow (intrinsic)", () => {
-    expect(expr(`<div el={<p></p>}/>`)).toMatchCode(`
+    expect(transpiledExpression(`<div el={<p></p>}/>`)).toMatchCode(`
         jsx("div", {
             el: () => jsx("p", {})
         });
@@ -470,7 +480,7 @@ describe("elements", () => {
   });
 
   test("img with static attrs", () => {
-    expect(full(`<img src="url://" data-test-id={0} />`)).toMatchCode(`
+    expect(transpiledCode(`<img src="url://" data-test-id={0} />`)).toMatchCode(`
         import { jsx } from "preact/jsx-runtime";
         jsx("img", {
             src: "url://",
@@ -480,7 +490,7 @@ describe("elements", () => {
   });
 
   test("on* handlers are never wrapped", () => {
-    expect(full(`
+    expect(transpiledCode(`
         <p onClick={handler} onclick={() => handler()} onclick={handler()}/>
     `)).toMatchCode(`
         import { jsx } from "preact/jsx-runtime";
@@ -493,7 +503,7 @@ describe("elements", () => {
   });
 
   test("spread attribute (non-reactive)", () => {
-    expect(expr(`<div class={"cx"} {...unknown}></div>`)).toMatchCode(`
+    expect(transpiledExpression(`<div class={"cx"} {...unknown}></div>`)).toMatchCode(`
         jsx("div", {
             class: "cx",
             ...unknown
@@ -502,7 +512,7 @@ describe("elements", () => {
   });
 
   test("reactive array spread child uses arrow (intrinsic)", () => {
-    expect(expr(`<div>{['a', ...unknown.value]}</div>`)).toMatchCode(`
+    expect(transpiledExpression(`<div>{['a', ...unknown.value]}</div>`)).toMatchCode(`
         jsx("div", {
             children: () => ['a', ...unknown.value]
         });
@@ -510,7 +520,7 @@ describe("elements", () => {
   });
 
   test("non-reactive array spread child uses plain prop", () => {
-    expect(expr(`<div>{['a', ...unknown]}</div>`)).toMatchCode(`
+    expect(transpiledExpression(`<div>{['a', ...unknown]}</div>`)).toMatchCode(`
         jsx("div", {
             children: ['a', ...unknown]
         });
@@ -518,7 +528,7 @@ describe("elements", () => {
   });
 
   test("comprehensive element with all prop types", () => {
-    expect(full(`
+    expect(transpiledCode(`
         let value, fn, obj;
         <div class="one" style="color: red;"
              data-field={value}
@@ -552,12 +562,12 @@ describe("elements", () => {
   });
 
   test("boolean attribute (no value) becomes booleanLiteral true", () => {
-    expect(expr(`<input disabled />`)).toMatchCode(`
+    expect(transpiledExpression(`<input disabled />`)).toMatchCode(`
         jsx("input", {
             disabled: true
         });
       `);
-    expect(expr(`<input required readonly />`)).toMatchCode(`
+    expect(transpiledExpression(`<input required readonly />`)).toMatchCode(`
         jsx("input", {
             required: true,
             readonly: true
@@ -566,7 +576,7 @@ describe("elements", () => {
   });
 
   test("is: directive uses getter even on intrinsic", () => {
-    expect(expr(`
+    expect(transpiledExpression(`
         let axis = {value: "north south"};
         <div is:resizable={axis.value}></div>
     `)).toMatchCode(`
@@ -586,7 +596,7 @@ describe("elements", () => {
 
 describe("reactive props", () => {
   test("template literal with member access is reactive", () => {
-    expect(expr(`
+    expect(transpiledExpression(`
         <div class="editor" style={\`display:\${mode.value === "source" ? "block" : "none"}\`} />
     `)).toMatchCode(`
         jsx("div", {
@@ -601,21 +611,21 @@ describe("reactive props", () => {
 
 describe("key prop", () => {
   test("string key is passed as third argument", () => {
-    expect(full(`<div key="x" />`)).toMatchCode(`
+    expect(transpiledCode(`<div key="x" />`)).toMatchCode(`
       import { jsx } from "preact/jsx-runtime";
       jsx("div", {}, "x");
     `);
   });
 
   test("expression key is passed as third argument", () => {
-    expect(full(`<div key={id} />`)).toMatchCode(`
+    expect(transpiledCode(`<div key={id} />`)).toMatchCode(`
       import { jsx } from "preact/jsx-runtime";
       jsx("div", {}, id);
     `);
   });
 
   test("key with other props is not included in props object", () => {
-    expect(full(`<div class="a" key="k" />`)).toMatchCode(`
+    expect(transpiledCode(`<div class="a" key="k" />`)).toMatchCode(`
       import { jsx } from "preact/jsx-runtime";
       jsx("div", {
         class: "a"
@@ -628,7 +638,7 @@ describe("key prop", () => {
 
 describe("elements with xmlns", () => {
   test("svg: namespace prefix maps to configured svg factory (default: jsx)", () => {
-    expect(expr(`
+    expect(transpiledExpression(`
         <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
             <path d="M1 8s3-5.5 8-5.5S17 8"/>
         </svg>
@@ -646,21 +656,21 @@ describe("elements with xmlns", () => {
   });
 
   test("svg:g namespace syntax maps to svg factory", () => {
-    expect(full(`<svg:g></svg:g>`)).toMatchCode(`
+    expect(transpiledCode(`<svg:g></svg:g>`)).toMatchCode(`
         import { jsx } from "preact/jsx-runtime";
         jsx("g", {});
     `);
   });
 
   test("xhtml:a namespace syntax maps to xhtml factory", () => {
-    expect(full(`<xhtml:a></xhtml:a>`)).toMatchCode(`
+    expect(transpiledCode(`<xhtml:a></xhtml:a>`)).toMatchCode(`
         import { jsx } from "preact/jsx-runtime";
         jsx("a", {});
     `);
   });
 
   test("custom namespace prefix resolves to identifier in scope", () => {
-    expect(full(`
+    expect(transpiledCode(`
         let h = () => {};
         <h:a></h:a>
     `)).toMatchCode(`
@@ -670,16 +680,16 @@ describe("elements with xmlns", () => {
   });
 
   test("xmlns with unknown string value throws", () => {
-    expect(() => transformWithBabel(`<div xmlns="http://example.com/ns" />`)).
+    expect(() => transformSync(`<div xmlns="http://example.com/ns" />`)).
         toThrow("invalid xmlns value: \"http://example.com/ns\"");
   });
 
   test("xmlns with non-string value throws", () => {
-    expect(() => transformWithBabel(`<div xmlns={ns} />`)).toThrow("invalid xmlns type: JSXExpressionContainer");
+    expect(() => transformSync(`<div xmlns={ns} />`)).toThrow("invalid xmlns type: JSXExpressionContainer");
   });
 
   test("xmlns attribute switches factory for element and descendants", () => {
-    expect(expr(`
+    expect(transpiledExpression(`
         <svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">
           <foreignObject x="10" y="10" width="280" height="180">
             <div xmlns="http://www.w3.org/1999/xhtml" style="width: 100%; height: 100%">
@@ -712,7 +722,7 @@ describe("elements with xmlns", () => {
 
 describe("expressions", () => {
   test("TypeScript props with member access are reactive", () => {
-    expect(expr(`
+    expect(transpiledExpression(`
         function FC(props: { letter: string, counter: number }) {
             return <div>{props.letter + ":" + props.counter}</div>;
         }
@@ -729,7 +739,7 @@ describe("expressions", () => {
   });
 
   test("assignment expressions with member/index access are reactive", () => {
-    expect(expr(`
+    expect(transpiledExpression(`
         function FC(props) {
             return <div k={y = props.z} w={y[0] = 0}>{x = <Fragment></Fragment>}</div>
         }
@@ -745,7 +755,7 @@ describe("expressions", () => {
   });
 
   test("new expression with .value is reactive", () => {
-    expect(expr(`<div>{new Computed(() => props.message).value}</div>`)).toMatchCode(`
+    expect(transpiledExpression(`<div>{new Computed(() => props.message).value}</div>`)).toMatchCode(`
         jsx("div", {
             children: () => new Computed(() => props.message).value
         });
@@ -753,7 +763,7 @@ describe("expressions", () => {
   });
 
   test("computed call with .value is reactive", () => {
-    expect(expr(`<div>{computed(() => props.message).value}</div>`)).toMatchCode(`
+    expect(transpiledExpression(`<div>{computed(() => props.message).value}</div>`)).toMatchCode(`
         jsx("div", {
             children: () => computed(() => props.message).value
         });
@@ -761,7 +771,7 @@ describe("expressions", () => {
   });
 
   test("named function expression is not reactive (skipped)", () => {
-    expect(expr(`<div>{function X() { return props.message }}</div>`)).toMatchCode(`
+    expect(transpiledExpression(`<div>{function X() { return props.message }}</div>`)).toMatchCode(`
         jsx("div", {
             children: function X() {
                 return props.message;
@@ -771,7 +781,7 @@ describe("expressions", () => {
   });
 
   test("IIFE (immediately invoked function expression) is reactive", () => {
-    expect(expr(`<div>{(function X() { return props.message })()}</div>`)).toMatchCode(`
+    expect(transpiledExpression(`<div>{(function X() { return props.message })()}</div>`)).toMatchCode(`
         jsx("div", {
             children: () => function X() {
                 return props.message;
@@ -785,7 +795,7 @@ describe("expressions", () => {
 
 describe("configurable factories", () => {
   test("custom svg factory produces distinct import and call", () => {
-    expect(full(
+    expect(transpiledCode(
         `<svg:g></svg:g>`,
         {factories: {svg: {module: "my-svg", name: "svg"}}}
     )).toMatchCode(`
@@ -795,7 +805,7 @@ describe("configurable factories", () => {
   });
 
   test("custom jsx module is used for all elements", () => {
-    expect(full(
+    expect(transpiledCode(
         `<div/>`,
         {factories: {jsx: {module: "my-jsx", name: "h"}}}
     )).toMatchCode(`
@@ -807,7 +817,7 @@ describe("configurable factories", () => {
 
 describe("import aliases", () => {
   test("alias rewrites import source", () => {
-    expect(full(
+    expect(transpiledCode(
         `import { signal } from "my-signals"; <div/>;`,
         {aliases: {"my-signals": "@preact/signals"}}
     )).toMatchCode(`
@@ -815,46 +825,9 @@ describe("import aliases", () => {
         import { signal } from "@preact/signals";
         jsx("div", {});
     `);
-    expect(full(
+    expect(transpiledCode(
         `import { signal } from "my-signals"; <div/>;`,
         {aliases: {"my-signals": "@preact/signals"}}
     )).not.toContain("my-signals");
-  });
-});
-
-// ─── esbuild integration ──────────────────────────────────────────────────────
-
-describe("esbuild integration", () => {
-  test("basic element transforms via esbuild", async () => {
-    expect(normalize(await transformWithESBuild(
-        `<div class="hello">World</div>;`
-    ))).toBe(normalize(`
-        import { jsx } from "preact/jsx-runtime";
-        jsx("div", {
-            class: "hello",
-            children: "World"
-        });
-    `));
-  });
-
-  test("reactive child is wrapped in arrow via esbuild", async () => {
-    expect(normalize(await transformWithESBuild(
-        `<div>{fn()}</div>;`
-    ))).toBe(normalize(`
-        import { jsx } from "preact/jsx-runtime";
-        jsx("div", {
-            children: () => fn()
-        });
-    `));
-  });
-
-  test("plugin options are forwarded via esbuild", async () => {
-    expect(normalize(await transformWithESBuild(
-        `<svg:g/>;`,
-        {factories: {svg: {module: "my-svg", name: "svg"}}}
-    ))).toBe(normalize(`
-        import { svg } from "my-svg";
-        svg("g", {});
-    `));
   });
 });

@@ -13,12 +13,16 @@
     "README.md"
   ],
   "scripts": {
-    "test": "jest --coverage"
+    "bundle": "node bundle.js",
+    "test": "jest --no-cache --coverage"
   },
   "jest": {
     "collectCoverageFrom": [
       "index.js"
-    ]
+    ],
+    "transform": {
+      "\\.(ts|tsx|jsx)$": "babel-jest"
+    }
   },
   "peerDependencies": {
     "@babel/core": "^7.29.0",
@@ -28,9 +32,14 @@
   "devDependencies": {
     "@babel/core": "^7.29.0",
     "@babel/plugin-syntax-jsx": "^7.28.6",
+    "@babel/plugin-transform-modules-commonjs": "^7.28.6",
+    "@babel/preset-typescript": "^7.28.5",
+    "@babel/standalone": "^7.29.1",
     "@babel/types": "^7.29.0",
     "esbuild": "^0.27.3",
+    "jasmine-core": "^5.6.0",
     "esbuild-babel-plugin": "^0.5.0",
-    "jest": "^30.2.0"
+    "jest": "^30.2.0",
+    "preact": "^10.26.5"
   }
 }

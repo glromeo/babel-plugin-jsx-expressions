@@ -222,6 +222,9 @@ module.exports = function pluginJsxExpressions(babel, options = {}) {
           for (const node of root.node.body) {
             if (node.type !== "ImportDeclaration" && node.type !== "InterpreterDirective") break;
             if (node.source.value === module) {
+              if (node.specifiers.some(s => s.type === "ImportSpecifier" && s.local.name === name)) {
+                return id;
+              }
               node.specifiers.unshift(importSpecifier(id, id));
               return id;
             }
@@ -232,9 +235,11 @@ module.exports = function pluginJsxExpressions(babel, options = {}) {
 
         const factories = {};
         for (const key of Object.keys(factoryConfig)) {
+          let name = null;
           Object.defineProperty(factories, key, {
             get() {
-              return Object.defineProperty(this, key, {value: importIdentifier(factoryConfig[key])})[key];
+              if (name === null) name = importIdentifier(factoryConfig[key]).name;
+              return identifier(name);
             },
             configurable: true,
             enumerable: true
