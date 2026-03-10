@@ -11,3 +11,6 @@
 /coverage/clover.xml
 /coverage/coverage-final.json
 /coverage/lcov.info
+/dist/jasmine.js
+/dist/plugin.mjs
+/.claude/settings.local.json
